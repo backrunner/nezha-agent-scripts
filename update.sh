@@ -125,12 +125,6 @@ check_agent_exists() {
         err "Please install nezha-agent first"
         exit 1
     fi
-
-    if [ ! -f "/etc/init.d/nezha-service" ]; then
-        err "Service script not found at /etc/init.d/nezha-service"
-        err "Please install nezha-agent service first"
-        exit 1
-    fi
 }
 
 get_current_version() {
@@ -143,37 +137,42 @@ get_current_version() {
 stop_service() {
     info "Stopping nezha-agent service..."
 
-    # 检查服务脚本是否存在
-    if [ ! -f "/etc/init.d/nezha-service" ]; then
-        err "Service script not found at /etc/init.d/nezha-service"
-        exit 1
+    # 查找配置文件并停止服务
+    config_found=false
+    if [ -d "$NZ_AGENT_PATH" ]; then
+        for config_file in "$NZ_AGENT_PATH"/config*.yml; do
+            if [ -f "$config_file" ]; then
+                config_found=true
+                info "Stopping service with config: $config_file"
+                sudo "$NZ_AGENT_PATH/nezha-agent" service -c "$config_file" stop >/dev/null 2>&1
+            fi
+        done
     fi
 
-    # 停止服务
-    if sudo /etc/init.d/nezha-service stop >/dev/null 2>&1; then
-        success "nezha-agent service stopped"
-    else
-        err "Failed to stop nezha-agent service"
+    if [ "$config_found" = false ]; then
+        err "No config file found in $NZ_AGENT_PATH"
         exit 1
     fi
 
     # 等待服务完全停止
     sleep 2
+    success "nezha-agent service stopped"
 }
 
 start_service() {
     info "Starting nezha-agent service..."
 
-    # 启动服务
-    if sudo /etc/init.d/nezha-service start >/dev/null 2>&1; then
-        success "nezha-agent service started"
-    else
-        err "Failed to start nezha-agent service"
-        exit 1
-    fi
+    # 查找配置文件并启动服务
+    for config_file in "$NZ_AGENT_PATH"/config*.yml; do
+        if [ -f "$config_file" ]; then
+            info "Starting service with config: $config_file"
+            sudo "$NZ_AGENT_PATH/nezha-agent" service -c "$config_file" start >/dev/null 2>&1
+        fi
+    done
 
     # 等待服务启动
     sleep 2
+    success "nezha-agent service started"
 }
 
 download_latest() {
