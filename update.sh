@@ -127,12 +127,7 @@ check_agent_exists() {
     fi
 }
 
-get_current_version() {
-    current_version=$("$NZ_AGENT_PATH/nezha-agent" -v 2>/dev/null | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1)
-    if [ -z "$current_version" ]; then
-        current_version="unknown"
-    fi
-}
+
 
 stop_service() {
     info "Stopping nezha-agent service..."
@@ -181,8 +176,7 @@ download_latest() {
     if [ -z "$CN" ]; then
         NZ_AGENT_URL="https://${GITHUB_URL}/nezhahq/agent/releases/latest/download/nezha-agent_${os}_${os_arch}.zip"
     else
-        _version=$(curl -m 10 -sL "https://gitee.com/api/v5/repos/naibahq/agent/releases/latest" | awk -F '"' '{for(i=1;i<=NF;i++){if($i=="tag_name"){print $(i+2)}}}')
-        NZ_AGENT_URL="https://${GITHUB_URL}/naibahq/agent/releases/download/${_version}/nezha-agent_${os}_${os_arch}.zip"
+        NZ_AGENT_URL="https://${GITHUB_URL}/naibahq/agent/releases/download/${latest_version}/nezha-agent_${os}_${os_arch}.zip"
     fi
 
     if command -v wget >/dev/null 2>&1; then
@@ -236,10 +230,19 @@ update_binary() {
     success "Binary updated successfully"
 }
 
-get_new_version() {
-    new_version=$("$NZ_AGENT_PATH/nezha-agent" -v 2>/dev/null | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1)
-    if [ -z "$new_version" ]; then
-        new_version="unknown"
+get_latest_version() {
+    info "Checking latest version..."
+    
+    if [ -z "$CN" ]; then
+        # 海外用户使用 GitHub API
+        latest_version=$(curl -m 10 -sL "https://api.github.com/repos/nezhahq/agent/releases/latest" | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    else
+        # 中国用户使用 Gitee API
+        latest_version=$(curl -m 10 -sL "https://gitee.com/api/v5/repos/naibahq/agent/releases/latest" | awk -F '"' '{for(i=1;i<=NF;i++){if($i=="tag_name"){print $(i+2)}}}')
+    fi
+    
+    if [ -z "$latest_version" ]; then
+        latest_version="unknown"
     fi
 }
 
@@ -268,9 +271,9 @@ update() {
     info "========================================="
 
     check_agent_exists
-    get_current_version
+    get_latest_version
 
-    info "Current version: $current_version"
+    info "Latest version: $latest_version"
     info "Updating to latest version..."
 
     download_latest
@@ -279,12 +282,9 @@ update() {
     update_binary
     start_service
 
-    get_new_version
-
     info "========================================="
     success "Update completed successfully!"
-    info "Previous version: $current_version"
-    info "Current version: $new_version"
+    info "Updated to version: $latest_version"
     info "========================================="
 }
 
